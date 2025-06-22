@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import MCPConfig from './components/MCPConfig';
 
 // 类型定义
 interface Message {
@@ -28,11 +29,7 @@ interface LLMResponse {
   usage?: any;
 }
 
-interface MCPTool {
-  name: string;
-  description: string;
-  inputSchema?: any;
-}
+
 
 export default function Home() {
   // 状态管理
@@ -61,9 +58,7 @@ export default function Home() {
     message: string;
     type: 'success' | 'error' | 'warning' | 'info';
   }>({ show: false, message: '', type: 'info' });
-  const [mcpConnected, setMcpConnected] = useState(false);
-  const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
-  const [mcpConnecting, setMcpConnecting] = useState(false);
+
 
   // 引用
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -78,21 +73,6 @@ export default function Home() {
     creative: "你是一个创意写作助手。请发挥想象力，创作有趣和富有创意的内容。"
   };
 
-  // 获取MCP连接状态
-  const checkMCPStatus = useCallback(async () => {
-    try {
-      const response = await fetch('/api/mcp/connect');
-      const data = await response.json();
-      
-      if (data.success) {
-        setMcpConnected(data.connected);
-        setMcpTools(data.tools || []);
-      }
-    } catch (error) {
-      console.error('获取MCP状态失败:', error);
-    }
-  }, []);
-
   // 初始化配置
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -100,10 +80,8 @@ export default function Home() {
       if (savedConfig) {
         setConfig(prev => ({ ...prev, ...JSON.parse(savedConfig) }));
       }
-      // 检查MCP连接状态
-      checkMCPStatus();
     }
-  }, [checkMCPStatus]);
+  }, []);
 
   // 工具函数
   const showNotification = useCallback((message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -166,61 +144,7 @@ export default function Home() {
     }
   }, [config]);
 
-  // MCP连接 - 调用后端API
-  const connectToMCP = useCallback(async () => {
-    setMcpConnecting(true);
-    try {
-      console.log('🔌 正在连接到 MCP 服务器:', config.mcpServer);
-      
-      const response = await fetch('/api/mcp/connect', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          serverUrl: config.mcpServer
-        })
-      });
 
-      const data = await response.json();
-
-      if (data.success && data.connected) {
-        setMcpConnected(true);
-        setMcpTools(data.tools || []);
-        showNotification(data.message || 'MCP服务器连接成功！', 'success');
-        console.log('✅ MCP连接成功，可用工具:', data.tools);
-      } else {
-        throw new Error(data.error || '连接失败');
-      }
-    } catch (error) {
-      setMcpConnected(false);
-      setMcpTools([]);
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
-      showNotification('MCP服务器连接失败: ' + errorMessage, 'error');
-      console.error('❌ MCP连接失败:', error);
-    } finally {
-      setMcpConnecting(false);
-    }
-  }, [config.mcpServer, showNotification]);
-
-  // 断开MCP连接
-  const disconnectMCP = useCallback(async () => {
-    try {
-      const response = await fetch('/api/mcp/connect', {
-        method: 'DELETE'
-      });
-      
-      const data = await response.json();
-      if (data.success) {
-        setMcpConnected(false);
-        setMcpTools([]);
-        showNotification(data.message || 'MCP连接已断开', 'info');
-      }
-    } catch (error) {
-      console.error('断开MCP连接失败:', error);
-      showNotification('断开连接失败', 'error');
-    }
-  }, [showNotification]);
 
   // 发送消息
   const sendMessage = useCallback(async () => {
@@ -398,6 +322,14 @@ export default function Home() {
     }
   }, [promptTemplates]);
 
+  // 配置变更处理
+  const handleConfigChange = useCallback((key: string, value: any) => {
+    setConfig(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  }, []);
+
   return (
     <div className="app-container">
       {/* 侧边栏配置面板 */}
@@ -511,81 +443,12 @@ export default function Home() {
         </div>
 
         {/* MCP 配置 */}
-        <div className="config-section">
-          <h4><i className="fas fa-plug"></i> MCP 设置</h4>
-          <div className="form-group">
-            <label htmlFor="mcpEnabled">启用MCP:</label>
-            <input 
-              type="checkbox" 
-              id="mcpEnabled" 
-              className="checkbox"
-              checked={config.mcpEnabled}
-              onChange={(e) => setConfig(prev => ({ ...prev, mcpEnabled: e.target.checked }))}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="mcpServer">MCP 服务器地址:</label>
-            <input 
-              type="text" 
-              id="mcpServer" 
-              placeholder="http://localhost:1122"
-              value={config.mcpServer}
-              onChange={(e) => setConfig(prev => ({ ...prev, mcpServer: e.target.value }))}
-            />
-          </div>
-          
-          {config.mcpEnabled && (
-            <>
-              <div className="form-group">
-                <div className="mcp-connection-controls">
-                  <button 
-                    className="btn btn-secondary"
-                    onClick={connectToMCP}
-                    disabled={mcpConnecting || mcpConnected}
-                  >
-                    <i className={mcpConnecting ? "fas fa-spinner fa-spin" : "fas fa-plug"}></i>
-                    {mcpConnecting ? '连接中...' : '连接MCP服务器'}
-                  </button>
-                  
-                  {mcpConnected && (
-                    <button 
-                      className="btn btn-warning"
-                      onClick={disconnectMCP}
-                      style={{ marginLeft: '8px' }}
-                    >
-                      <i className="fas fa-unlink"></i>
-                      断开连接
-                    </button>
-                  )}
-                </div>
-                
-                <div className="status-indicator">
-                  <span className={`status-dot ${mcpConnected ? 'status-connected' : 'status-disconnected'}`}></span>
-                  <span>{mcpConnected ? '已连接' : '未连接'}</span>
-                  {mcpConnected && mcpTools.length > 0 && (
-                    <span style={{ marginLeft: '8px', color: 'var(--text-secondary)' }}>
-                      ({mcpTools.length} 个工具)
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              {mcpTools.length > 0 && (
-                <div className="form-group">
-                  <label>可用工具:</label>
-                  <div className="tools-list">
-                    {mcpTools.map((tool, index) => (
-                      <div key={index} className="tool-item">
-                        <strong>{tool.name}</strong><br />
-                        <small>{tool.description}</small>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <MCPConfig
+          mcpEnabled={config.mcpEnabled}
+          mcpServer={config.mcpServer}
+          onConfigChange={handleConfigChange}
+          onNotification={showNotification}
+        />
 
         {/* 配置操作 */}
         <div className="config-actions">
