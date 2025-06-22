@@ -887,4 +887,29 @@ body {
 .message-content pre code {
     background: none;
     padding: 0;
+}
+
+/* MCP连接控件样式 */
+.mcp-connection-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.mcp-connection-controls .btn {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.btn-warning {
+    background: var(--warning-color);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+    transform: translateY(-1px);
 } 
