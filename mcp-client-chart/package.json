@@ -1,0 +1,29 @@
+{
+  "name": "mcp-client-chart",
+  "version": "1.0.0",
+  "description": "MCP 图表客户端",
+  "type": "module",
+  "main": "client.js",
+  "scripts": {
+    "start": "node client.js",
+    "dev": "nodemon client.js",
+    "build": "chmod +x build.sh && ./build.sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "axios": "^1.6.0",
+    "commander": "^11.0.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "client",
+    "chart",
+    "model-context-protocol"
+  ],
+  "author": "MCP Client Chart",
+  "license": "MIT"
+} 

@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  chatbot-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_APP_NAME=智能聊天机器人
+      - NEXT_PUBLIC_APP_VERSION=2.0.0
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    volumes:
+      # 如果需要持久化配置，可以挂载卷
+      - ./config:/app/config
+    
+  # 可选：如果需要本地运行 MCP 服务器
+  # mcp-server:
+  #   image: mcp-server-chart:latest
+  #   ports:
+  #     - "1122:1122"
+  #   restart: unless-stopped
+  #   networks:
+  #     - chatbot-network
+
+networks:
+  chatbot-network:
+    driver: bridge
+
+volumes:
+  config: 

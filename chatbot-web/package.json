@@ -1,0 +1,59 @@
+{
+  "name": "chatbot-web-nextjs",
+  "version": "2.0.0",
+  "description": "智能聊天机器人Next.js应用 - 支持自定义LLM、Prompt工程和MCP集成",
+  "private": true,
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "@modelcontextprotocol/sdk": "^1.5.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "export": "next export",
+    "type-check": "tsc --noEmit"
+  },
+  "eslintConfig": {
+    "extends": [
+      "next/core-web-vitals"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "homepage": ".",
+  "keywords": [
+    "chatbot",
+    "llm",
+    "openai",
+    "mcp",
+    "prompt-engineering",
+    "nextjs",
+    "react",
+    "typescript",
+    "ssr"
+  ],
+  "author": "ChatBot Web Next.js",
+  "license": "MIT"
+} 
