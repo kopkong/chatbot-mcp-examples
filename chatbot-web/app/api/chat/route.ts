@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
         const messagesWithMCP = [
           {
             role: 'system',
-            content: `你是一个具有MCP工具调用能力的AI助手，工具调用结果：${mcpResult}\n\n请基于上述工具调用结果，为用户提供有帮助的回复。如果工具调用结果中包含了链接，请附加到回复中`
+            content: `你是一个具有MCP工具调用能力的AI助手，工具调用结果：${mcpResult}\n\n请基于上述工具调用结果，为用户提供有帮助的回复。如果工具调用结果中包含了链接，请将链接以markdown图片的形式添加到回复中`
           },
           ...messages.filter(messages => messages.role === 'user')
         ];

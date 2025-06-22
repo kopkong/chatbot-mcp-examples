@@ -1,6 +1,9 @@
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Components } from 'react-markdown';
 import { Message, Config } from '../types';
 
 interface ChatInterfaceProps {
@@ -31,15 +34,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, []);
-
-  const formatMessage = useCallback((content: string) => {
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-      .replace(/\n/g, '<br>');
   }, []);
 
   // 发送消息
@@ -82,6 +76,57 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, typing, scrollToBottom]);
+
+  // Markdown 组件配置
+  const markdownComponents: Components = {
+    // 自定义代码块样式
+    code: ({ inline, className, children, ...props }: any) => {
+      const match = /language-(\w+)/.exec(className || '');
+      return !inline ? (
+        <pre className="code-block">
+          <code className={className} {...props}>
+            {children}
+          </code>
+        </pre>
+      ) : (
+        <code className="inline-code" {...props}>
+          {children}
+        </code>
+      );
+    },
+    // 自定义表格样式
+    table: ({ children }: any) => (
+      <div className="table-wrapper">
+        <table className="markdown-table">{children}</table>
+      </div>
+    ),
+    // 自定义链接样式
+    a: ({ href, children }: any) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link">
+        {children}
+      </a>
+    ),
+    // 自定义列表样式
+    ul: ({ children }: any) => (
+      <ul className="markdown-list">{children}</ul>
+    ),
+    ol: ({ children }: any) => (
+      <ol className="markdown-list">{children}</ol>
+    ),
+    // 自定义标题样式
+    h1: ({ children }: any) => <h1 className="markdown-h1">{children}</h1>,
+    h2: ({ children }: any) => <h2 className="markdown-h2">{children}</h2>,
+    h3: ({ children }: any) => <h3 className="markdown-h3">{children}</h3>,
+    h4: ({ children }: any) => <h4 className="markdown-h4">{children}</h4>,
+    h5: ({ children }: any) => <h5 className="markdown-h5">{children}</h5>,
+    h6: ({ children }: any) => <h6 className="markdown-h6">{children}</h6>,
+    // 自定义引用样式
+    blockquote: ({ children }: any) => (
+      <blockquote className="markdown-blockquote">{children}</blockquote>
+    ),
+    // 自定义分割线样式
+    hr: () => <hr className="markdown-hr" />,
+  };
 
   return (
     <div className="main-content">
@@ -145,10 +190,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             {messages.map((message, index) => (
               <div key={index} className={`message ${message.role}`}>
                 <div className="message-content">
-                  <div 
-                    className="message-text"
-                    dangerouslySetInnerHTML={{ __html: formatMessage(message.content) }}
-                  />
+                  <div className="message-text">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={markdownComponents}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                   <div className="message-time">{message.timestamp}</div>
                 </div>
               </div>
