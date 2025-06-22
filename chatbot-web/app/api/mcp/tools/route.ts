@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { memoryDB } from '../../../lib/memoryDB';
+import { MemoryDB } from '../../../lib/memoryDB';
 
 interface ToolCallRequest {
   toolName: string;
@@ -9,8 +9,8 @@ interface ToolCallRequest {
   };
 }
 
-// MCP工具调用映射
-const mcpTools = {
+// 内置工具调用映射（用于模拟MCP工具调用）
+const builtinToolHandlers = {
   'file_read': {
     description: '读取文件内容',
     handler: async (params: any) => {
@@ -53,66 +53,21 @@ const mcpTools = {
   }
 };
 
-// 解析用户消息，识别需要调用的工具
-function parseToolCall(content: string): { toolName: string; parameters: any } | null {
-  const lowerContent = content.toLowerCase();
-  
-  // 文件读取
-  if (lowerContent.includes('读取') || lowerContent.includes('read') || lowerContent.includes('打开')) {
-    const fileMatch = content.match(/(?:读取|read|打开)\s*["""]?([^"""]+)["""]?/);
-    if (fileMatch) {
-      return {
-        toolName: 'file_read',
-        parameters: { path: fileMatch[1] }
-      };
+// 调用MCP工具
+async function callMCPTool(toolName: string, parameters: any): Promise<string> {
+  try {
+    // 首先检查是否为内置工具处理器
+    if (builtinToolHandlers[toolName as keyof typeof builtinToolHandlers]) {
+      const handler = builtinToolHandlers[toolName as keyof typeof builtinToolHandlers];
+      return await handler.handler(parameters);
     }
+
+    // 这里应该调用真正的MCP工具
+    // 目前返回模拟结果
+    return `MCP工具 "${toolName}" 调用成功，参数：${JSON.stringify(parameters)}`;
+  } catch (error) {
+    throw new Error(`工具调用失败: ${error instanceof Error ? error.message : '未知错误'}`);
   }
-  
-  // 文件写入
-  if (lowerContent.includes('写入') || lowerContent.includes('write') || lowerContent.includes('保存')) {
-    const fileMatch = content.match(/(?:写入|write|保存)\s*["""]?([^"""]+)["""]?/);
-    if (fileMatch) {
-      return {
-        toolName: 'file_write',
-        parameters: { path: fileMatch[1] }
-      };
-    }
-  }
-  
-  // 网络搜索
-  if (lowerContent.includes('搜索') || lowerContent.includes('search') || lowerContent.includes('查找')) {
-    const searchMatch = content.match(/(?:搜索|search|查找)\s*["""]?([^"""]+)["""]?/);
-    if (searchMatch) {
-      return {
-        toolName: 'web_search',
-        parameters: { query: searchMatch[1] }
-      };
-    }
-  }
-  
-  // 天气查询
-  if (lowerContent.includes('天气') || lowerContent.includes('weather')) {
-    const weatherMatch = content.match(/(?:天气|weather)\s*["""]?([^"""]+)["""]?/);
-    if (weatherMatch) {
-      return {
-        toolName: 'weather',
-        parameters: { location: weatherMatch[1] }
-      };
-    }
-  }
-  
-  // 计算器
-  if (lowerContent.includes('计算') || lowerContent.includes('calculate') || lowerContent.includes('=')) {
-    const calcMatch = content.match(/(?:计算|calculate|=\s*)([0-9+\-*/().\s]+)/);
-    if (calcMatch) {
-      return {
-        toolName: 'calculator',
-        parameters: { expression: calcMatch[1].trim() }
-      };
-    }
-  }
-  
-  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -120,15 +75,10 @@ export async function POST(request: NextRequest) {
     const body: ToolCallRequest = await request.json();
     const { toolName, parameters, config } = body;
 
-    // 检查工具是否存在
-    if (!mcpTools[toolName as keyof typeof mcpTools]) {
-      return NextResponse.json({
-        success: false,
-        error: `工具 "${toolName}" 不存在`
-      });
-    }
+    console.log(`🔧 调用工具: ${toolName}，参数:`, parameters);
 
     // 检查MCP连接状态
+    const memoryDB = MemoryDB.getInstance();
     const connectedServers = memoryDB.getConnectedMCPServers();
     if (connectedServers.length === 0) {
       return NextResponse.json({
@@ -137,9 +87,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 检查工具是否在连接的服务器中可用
+    const availableTools = memoryDB.getAllTools();
+    const allMCPTools = availableTools.flatMap(serverTools => serverTools.tools);
+    
+    const targetTool = allMCPTools.find(tool => tool.name === toolName);
+    if (!targetTool && !builtinToolHandlers[toolName as keyof typeof builtinToolHandlers]) {
+      return NextResponse.json({
+        success: false,
+        error: `工具 "${toolName}" 不存在`
+      });
+    }
+
     // 调用工具
-    const tool = mcpTools[toolName as keyof typeof mcpTools];
-    const result = await tool.handler(parameters);
+    const result = await callMCPTool(toolName, parameters);
 
     // 记录工具调用到内存数据库
     const serverId = connectedServers[0].id; // 使用第一个连接的服务器
@@ -147,11 +108,13 @@ export async function POST(request: NextRequest) {
       lastPing: new Date()
     });
 
+    console.log(`✅ 工具调用成功: ${toolName}`);
+
     return NextResponse.json({
       success: true,
       result: result,
       toolName: toolName,
-      description: tool.description,
+      description: targetTool?.description || builtinToolHandlers[toolName as keyof typeof builtinToolHandlers]?.description,
       serverId: serverId
     });
   } catch (error) {
@@ -166,11 +129,12 @@ export async function POST(request: NextRequest) {
 // 获取可用工具列表
 export async function GET() {
   try {
+    const memoryDB = MemoryDB.getInstance();
     const connectedServers = memoryDB.getConnectedMCPServers();
     const allTools = memoryDB.getAllTools();
     
     // 合并内置工具和MCP服务器工具
-    const builtinTools = Object.entries(mcpTools).map(([name, tool]) => ({
+    const builtinTools = Object.entries(builtinToolHandlers).map(([name, tool]) => ({
       name,
       description: tool.description,
       type: 'builtin'

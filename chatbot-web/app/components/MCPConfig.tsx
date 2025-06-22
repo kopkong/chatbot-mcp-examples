@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { MCPConfigProps, MCPTool } from '../types';
+import MCPStatusPanel from './MCPStatusPanel';
 
 const MCPConfig: React.FC<MCPConfigProps> = ({
   mcpEnabled,
@@ -13,6 +14,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({
   const [mcpConnected, setMcpConnected] = useState(false);
   const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
   const [mcpConnecting, setMcpConnecting] = useState(false);
+  const [showStatusPanel, setShowStatusPanel] = useState(false);
 
   // 获取MCP连接状态
   const checkMCPStatus = useCallback(async () => {
@@ -142,6 +144,26 @@ const MCPConfig: React.FC<MCPConfigProps> = ({
                 <i className={mcpConnecting ? "fas fa-spinner fa-spin" : "fas fa-plug"}></i>
                 {mcpConnecting ? '连接中...' : '连接MCP服务器'}
               </button>
+              
+              {mcpConnected && (
+                <button 
+                  className="btn btn-warning"
+                  onClick={disconnectMCP}
+                  style={{ marginLeft: '8px' }}
+                >
+                  <i className="fas fa-unlink"></i>
+                  断开连接
+                </button>
+              )}
+
+              <button 
+                className="btn btn-info"
+                onClick={() => setShowStatusPanel(true)}
+                style={{ marginLeft: '8px' }}
+              >
+                <i className="fas fa-chart-bar"></i>
+                状态面板
+              </button>
             </div>
             
             <div className="status-indicator">
@@ -208,6 +230,12 @@ const MCPConfig: React.FC<MCPConfigProps> = ({
           </div>
         </>
       )}
+
+      {/* MCP状态面板 */}
+      <MCPStatusPanel
+        isOpen={showStatusPanel}
+        onClose={() => setShowStatusPanel(false)}
+      />
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { memoryDB } from '../../../lib/memoryDB';
+import { MemoryDB } from '../../../lib/memoryDB';
 
 export async function GET() {
   try {
+    const memoryDB = MemoryDB.getInstance();
     const stats = memoryDB.getStats();
     const allServers = memoryDB.getAllMCPServers();
     const connectedServers = memoryDB.getConnectedMCPServers();
@@ -33,6 +34,7 @@ export async function GET() {
 
 export async function DELETE() {
   try {
+    const memoryDB = MemoryDB.getInstance();
     memoryDB.reset();
     
     return NextResponse.json({
