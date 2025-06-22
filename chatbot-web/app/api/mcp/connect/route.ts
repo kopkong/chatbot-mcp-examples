@@ -1,178 +1,220 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { memoryDB } from '../../../lib/memoryDB';
+import { v4 as uuidv4 } from 'uuid';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { MCPTool } from '@/app/types';
 
-// 全局MCP客户端缓存
-let mcpClient: Client | null = null;
-let mcpTools: any[] = [];
-let lastServerUrl: string = '';
+interface ConnectRequest {
+  serverUrl: string;
+}
+
+// 模拟MCP工具发现
+async function discoverMCPServerTools(serverUrl: string): Promise<MCPTool[]> {
+  // 创建 HTTP 传输
+  const transport = new StreamableHTTPClientTransport(new URL(serverUrl));
+      
+  // 创建 MCP 客户端
+  const client = new Client(
+    {
+      name: "mcp-chart-client",
+      version: "1.0.0"
+    },
+    {
+      capabilities: {
+        tools: {}
+      }
+    }
+  );
+
+  // 连接到服务器
+  await client.connect(transport);
+  console.log('成功连接到 MCP 服务器');
+
+  // 获取服务器能力
+  const serverCapabilities = await client.listTools();
+  // console.log('📋 服务器可用工具:', serverCapabilities);
+
+  return serverCapabilities.tools.map(tool => {
+    const mcpTool = {
+        name: tool.name,
+        description: tool.description || '',
+        inputSchema: tool.inputSchema as any
+    }
+
+    return mcpTool;
+  });
+}
+
+// 模拟MCP服务器能力发现
+async function discoverMCPServerCapabilities(serverUrl: string): Promise<string[]> {
+  try {
+    // 这里应该实现真正的MCP协议能力发现
+    const mockCapabilities = [
+      'file_operations',
+      'web_search',
+      'weather_data',
+      'mathematical_calculations',
+      'text_processing'
+    ];
+
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    return mockCapabilities;
+  } catch (error) {
+    console.error('能力发现失败:', error);
+    return [];
+  }
+}
+
+// 测试MCP服务器连接
+async function testMCPServerConnection(serverUrl: string): Promise<boolean> {
+  try {
+    // 这里应该实现真正的MCP协议连接测试
+    // 目前模拟连接测试
+    const response = await fetch(`${serverUrl}/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: AbortSignal.timeout(5000) // 5秒超时
+    });
+
+    return response.ok;
+  } catch (error) {
+    console.error('MCP服务器连接测试失败:', error);
+    // 如果连接测试失败，我们仍然允许连接（用于开发环境）
+    return true;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { serverUrl } = await request.json();
+    const body: ConnectRequest = await request.json();
+    const { serverUrl } = body;
 
-    if (!serverUrl) {
-      return NextResponse.json(
-        { success: false, error: '缺少MCP服务器地址' },
-        { status: 400 }
-      );
-    }
-
-    // 如果服务器地址相同且已连接，直接返回缓存的结果
-    if (mcpClient && lastServerUrl === serverUrl) {
+    if (!serverUrl || !serverUrl.trim()) {
       return NextResponse.json({
-        success: true,
-        connected: true,
-        tools: mcpTools,
-        message: '使用已有连接'
+        success: false,
+        error: '服务器URL不能为空'
       });
     }
 
-    // 关闭之前的连接
-    if (mcpClient) {
-      try {
-        await mcpClient.close();
-      } catch (error) {
-        console.log('关闭旧连接时出错:', error);
-      }
-      mcpClient = null;
-      mcpTools = [];
-    }
+    console.log(`🔌 正在连接到 MCP 服务器: ${serverUrl}`);
 
-    // 创建新的MCP连接
-    console.log('🔌 正在连接到MCP服务器:', serverUrl);
-    
-    const transport = new StreamableHTTPClientTransport(new URL(serverUrl));
-    
-    const client = new Client(
-      {
-        name: "mcp-chart-client",
-        version: "1.0.0"
-      },
-      {
-        capabilities: {
-          tools: {}
-        }
-      }
-    );
-
-    // 设置连接超时
-    const connectPromise = client.connect(transport);
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('连接超时')), 10000)
-    );
-
-    await Promise.race([connectPromise, timeoutPromise]);
-    
-    console.log('✅ 成功连接到 MCP 服务器');
-
-    // 获取服务器可用工具
-    const serverCapabilities = await client.listTools();
-    console.log('📋 服务器可用工具:', serverCapabilities);
-
-    if (serverCapabilities.tools && serverCapabilities.tools.length > 0) {
-      mcpClient = client;
-      mcpTools = serverCapabilities.tools.map((tool: any) => ({
-        name: tool.name,
-        description: tool.description || '无描述',
-        inputSchema: tool.inputSchema || {}
-      }));
-      lastServerUrl = serverUrl;
-
+    // 检查是否已经存在该URL的服务器
+    const existingServer = memoryDB.getMCPServerByUrl(serverUrl);
+    if (existingServer && existingServer.connected) {
       return NextResponse.json({
         success: true,
         connected: true,
-        tools: mcpTools,
-        message: 'MCP服务器连接成功！'
+        message: 'MCP服务器已经连接',
+        serverId: existingServer.id,
+        tools: existingServer.tools,
       });
-    } else {
-      await client.close();
-      return NextResponse.json(
-        { 
-          success: false, 
-          connected: false,
-          error: '服务器没有可用工具' 
-        },
-        { status: 400 }
-      );
     }
+
+    // 发现工具和能力
+    const tools = await discoverMCPServerTools(serverUrl);
+
+    // 生成服务器ID
+    const serverId = existingServer?.id || uuidv4();
+    const serverName = `MCP Server ${serverId.slice(0, 8)}`;
+
+    // 创建或更新服务器记录
+    const server = {
+      id: serverId,
+      url: serverUrl,
+      name: serverName,
+      connected: true,
+      connectedAt: new Date(),
+      lastPing: new Date(),
+      tools: tools,
+      status: 'connected' as const
+    };
+
+    memoryDB.addMCPServer(server);
+
+    // 创建连接记录
+    const connection = {
+      serverId: serverId,
+      serverUrl: serverUrl,
+      isActive: true,
+      createdAt: new Date(),
+      lastActivity: new Date()
+    };
+
+    memoryDB.addConnection(connection);
+
+    console.log(`✅ MCP服务器连接成功: ${serverName}`);
+    console.log(`📦 发现 ${tools.length} 个工具`);
+
+    return NextResponse.json({
+      success: true,
+      connected: true,
+      message: 'MCP服务器连接成功',
+      serverId: serverId,
+      serverName: serverName,
+      tools: tools,
+      stats: memoryDB.getStats()
+    });
 
   } catch (error) {
     console.error('❌ MCP连接失败:', error);
-    
-    // 清理失败的连接
-    if (mcpClient) {
-      try {
-        await mcpClient.close();
-      } catch (e) {
-        console.log('清理连接时出错:', e);
-      }
-      mcpClient = null;
-      mcpTools = [];
-      lastServerUrl = '';
-    }
-
-    const errorMessage = error instanceof Error ? error.message : '未知错误';
-    
-    return NextResponse.json(
-      { 
-        success: false, 
-        connected: false,
-        error: `连接失败: ${errorMessage}` 
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : '连接失败'
+    });
   }
 }
 
-// 获取当前连接状态
 export async function GET() {
   try {
+    const connectedServers = memoryDB.getConnectedMCPServers();
+    const activeConnections = memoryDB.getAllActiveConnections();
+    const stats = memoryDB.getStats();
+
     return NextResponse.json({
       success: true,
-      connected: mcpClient !== null,
-      tools: mcpTools,
-      serverUrl: lastServerUrl
+      connected: connectedServers.length > 0,
+      servers: connectedServers,
+      activeConnections: activeConnections,
+      stats: stats
     });
   } catch (error) {
-    return NextResponse.json(
-      { 
-        success: false, 
-        connected: false,
-        error: '获取状态失败' 
-      },
-      { status: 500 }
-    );
+    console.error('获取MCP状态失败:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : '获取状态失败'
+    });
   }
 }
 
-// 断开连接
 export async function DELETE() {
   try {
-    if (mcpClient) {
-      await mcpClient.close();
-      mcpClient = null;
-      mcpTools = [];
-      lastServerUrl = '';
-      
-      return NextResponse.json({
-        success: true,
-        message: 'MCP连接已断开'
+    // 断开所有连接
+    const activeConnections = memoryDB.getAllActiveConnections();
+    activeConnections.forEach(connection => {
+      memoryDB.removeConnection(connection.serverId);
+      memoryDB.updateMCPServer(connection.serverId, {
+        connected: false,
+        status: 'disconnected'
       });
-    } else {
-      return NextResponse.json({
-        success: true,
-        message: '没有活动的连接'
-      });
-    }
+    });
+
+    console.log(`🔌 已断开 ${activeConnections.length} 个MCP连接`);
+
+    return NextResponse.json({
+      success: true,
+      message: '所有MCP连接已断开',
+      disconnectedCount: activeConnections.length
+    });
   } catch (error) {
-    console.error('断开MCP连接时出错:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: '断开连接失败' 
-      },
-      { status: 500 }
-    );
+    console.error('断开MCP连接失败:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : '断开连接失败'
+    });
   }
 } 

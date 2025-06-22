@@ -1,20 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react';
-
-// 类型定义
-interface MCPTool {
-  name: string;
-  description: string;
-  inputSchema?: any;
-}
-
-interface MCPConfigProps {
-  mcpEnabled: boolean;
-  mcpServer: string;
-  onConfigChange: (key: string, value: any) => void;
-  onNotification: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
-}
+import { MCPConfigProps, MCPTool } from '../types';
 
 const MCPConfig: React.FC<MCPConfigProps> = ({
   mcpEnabled,
@@ -110,16 +97,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({
     }
   }, [checkMCPStatus, mcpEnabled]);
 
-  // 测试连接
-  const testConnection = useCallback(async () => {
-    if (!mcpServer.trim()) {
-      onNotification('请先输入MCP服务器地址！', 'warning');
-      return;
-    }
-
-    await connectToMCP();
-  }, [connectToMCP, mcpServer]);
-
   return (
     <div className="config-section">
       <h4><i className="fas fa-plug"></i> MCP 设置</h4>
@@ -164,27 +141,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({
               >
                 <i className={mcpConnecting ? "fas fa-spinner fa-spin" : "fas fa-plug"}></i>
                 {mcpConnecting ? '连接中...' : '连接MCP服务器'}
-              </button>
-              
-              {mcpConnected && (
-                <button 
-                  className="btn btn-warning"
-                  onClick={disconnectMCP}
-                  style={{ marginLeft: '8px' }}
-                >
-                  <i className="fas fa-unlink"></i>
-                  断开连接
-                </button>
-              )}
-
-              <button 
-                className="btn btn-secondary"
-                onClick={testConnection}
-                disabled={mcpConnecting || !mcpServer.trim()}
-                style={{ marginLeft: '8px' }}
-              >
-                <i className="fas fa-vial"></i>
-                测试连接
               </button>
             </div>
             
